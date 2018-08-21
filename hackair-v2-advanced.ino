@@ -150,8 +150,10 @@ void setup() {
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  WiFiManagerParameter custom_hackair_api_token("hackair_api_token", "hackAIR API token", hackair_api_token, 40);
+  // WiFiManagerParameter custom_hackair_api_token("hackair_api_token", "hackAIR API token", hackair_api_token, 40);
 
+  WiFiManagerParameter custom_hackair_api_token("hackair_api_token", "hackAIR Access Key", hackair_api_token, 48);
+  
    wifiManager.addParameter(&custom_hackair_api_token);
 
   // start the sensor once with the following line uncommented to reset previous WiFi settings
