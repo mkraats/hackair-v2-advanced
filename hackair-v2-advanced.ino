@@ -32,7 +32,7 @@
 #define HOSTNAME "hackair" // hostname to use for MDNS under the .local extension ( hackair.local )
 #define AUTHORIZATION "CHANGEME" // hackAIR authorisation token
 #define DEBUG "1"               // set this to 1 to stop sending data to the hackAIR platform
-#define ADAFRUIT_IO_ENABLE "1"  // set this to 1 to enable Adafruit.io sending
+#define ADAFRUIT_IO_ENABLE "0"  // set this to 1 to enable Adafruit.io sending
 
 // Adafruit MQTT
 
@@ -85,6 +85,12 @@ void setup() {
   
   Serial.begin(9600);
   Serial.println("\nHackAIR v2 sensor");
+
+  if ( DEBUG == "1" ) {
+
+    Serial.println("Debug mode on, not sending data to hackAIR");
+    
+  }
     
   Serial.println("Ready");
   Serial.print("IP address: ");
@@ -199,40 +205,15 @@ void loop() {
     Serial.print(".");
   }
 
-  // Measure data
-  sensor.clearData(data);
-  sensor.refresh(data);
 
-  // Average readings (60 measurments)
   double pm25 = data.pm25;
   double pm10 = data.pm10;
   int error = 0;
   Serial.println("Measuring...");
-  for (int i = 0; i < 59; i++) {
 
-    digitalWrite(BUILTIN_LED, LOW); // turn on the LED while measuring
-    
-    // Read from the sensor
-    Serial.print(".");
-    sensor.refresh(data);
-
-    // If error is not zero something went wrong with this measurment
-    // and we should not send it.
-    if (data.error == 0) {
-      pm25 = (pm25 + data.pm25) / 2;
-      pm10 = (pm10 + data.pm10) / 2;
-    } else {
-      error++;
-    }
-    delay(1000);  // Wait one second
-
-    digitalWrite(BUILTIN_LED, HIGH); // turn off the LED
-    
-  }
-  data.pm25 = pm25;
-  data.pm10 = pm10;
-  data.error = error;
-
+// Measure data
+  sensor.clearData(data);
+  sensor.readAverageData(data, 60); // 60 averages
 
   // Measure humidity and temperature
     float humidity = dht.readHumidity();
@@ -242,33 +223,35 @@ void loop() {
   // construct the JSON to send to the hackAIR platform
 
   String dataJson = "{\"reading\":{\"PM2.5_AirPollutantValue\":\"";
-    dataJson += pm25;
+    dataJson += data.pm25;
     dataJson += "\",\"PM10_AirPollutantValue\":\"";
-    dataJson += pm10;
+    dataJson += data.pm10;
     dataJson += "\"},\"battery\":\"";
     dataJson += vdd;
     dataJson += "\",\"tamper\":\"";
     dataJson += "0";
     dataJson += "\",\"error\":\"";
-    dataJson += "0";
+    dataJson += data.error;
     dataJson += "\"}";
 
-  MQTT_connect();
+ 
 
-  if ( DEBUG ==! "1" ) {
+  if ( DEBUG != "1" ) {
 
     // send data to network
 
     if ( ADAFRUIT_IO_ENABLE == "1" ) {
 
-        
-        pm25_feed.publish(pm25);
-        pm10_feed.publish(pm10);
+        MQTT_connect();
+        pm25_feed.publish(data.pm25);
+        pm10_feed.publish(data.pm10);
         
     }
     
     // Send the data to the hackAIR server
-       
+
+    Serial.println("Sending data to hackAIR platform...");
+    
     if (client.connect("api.hackair.eu", 443)) {
       Serial.println("Connected to api.hackair.eu");
       client.print("POST /sensors/arduino/measurements HTTP/1.1\r\n");
@@ -300,6 +283,8 @@ void loop() {
 
     // DEBUG is on, output values to serial but don't send to network
 
+    Serial.println("DEBUG");
+    Serial.println(DEBUG);
     Serial.print("hackair API token: ");
     Serial.println(hackair_api_token); // write API token
     Serial.println(dataJson); // write sensor values to serial for debug
