@@ -31,7 +31,7 @@
 
 #define HOSTNAME "hackair" // hostname to use for MDNS under the .local extension ( hackair.local )
 #define AUTHORIZATION "CHANGEME" // hackAIR authorisation token
-#define DEBUG "1"               // set this to 1 to stop sending data to the hackAIR platform
+#define DEBUG "0"               // set this to 1 to stop sending data to the hackAIR platform
 #define ADAFRUIT_IO_ENABLE "0"  // set this to 1 to enable Adafruit.io sending
 
 // Adafruit MQTT
