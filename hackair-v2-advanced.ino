@@ -217,10 +217,15 @@ void loop() {
   sensor.clearData(data);
   sensor.readAverageData(data, 60); // 60 averages
 
-  // Measure humidity and temperature
-    float humidity = dht.readHumidity();
-    // Read temperature as Celsius (the default)
-    float temperature = dht.readTemperature();
+  if (data.error != H_ERROR_SENSOR) {
+  // Compensate for humidity
+  float humidity = dht.readHumidity();
+  if (isnan(humidity)) {
+    data.error |= H_ERROR_HUMIDITY;
+  } else {
+    sensor.humidityCompensation(data, humidity);
+  }
+  }
 
   // construct the JSON to send to the hackAIR platform
 
@@ -300,9 +305,6 @@ void loop() {
          (previous_millis + (minutes_time_interval * 60 * 1000))) {
     delay(10000);
     current_millis = millis();
-    
-    Serial.println(temperature);
-    Serial.println(humidity);
     
   }
   previous_millis = current_millis;
