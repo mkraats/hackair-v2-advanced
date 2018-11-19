@@ -302,12 +302,12 @@ void loop() {
   if ( sensebox_id != "" && osem_token != "") {
     // Send the data to the openSenseMap server
     Serial.println("Sending data to openSenseMap platform...");
-    if (client.connect("api.testing.opensensemap.org", 443)) {
-      Serial.println("Connected to api.testing.opensensemap.org");
+    if (client.connect("api.opensensemap.org", 443)) {
+      Serial.println("Connected to api.opensensemap.org");
       client.print("POST /boxes/");
       client.print(sensebox_id);
       client.print("/data?hackair=true HTTP/1.1\r\n");
-      client.print("Host: api.testing.opensensemap.org\r\n");
+      client.print("Host: api.opensensemap.org\r\n");
       client.print("Connection: close\r\n");
       client.print("Authorization: ");
       client.println(osem_token);
