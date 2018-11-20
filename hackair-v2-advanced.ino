@@ -14,8 +14,7 @@
 
 #include <Arduino.h>
 #include <DHT.h>                  // Adafruit's DHT sensor library https://github.com/adafruit/DHT-sensor-library
-#include <DHT_U.h>
-//#include <DNSServer.h>            // Local DNS Server used for redirecting all requests to the configuration portal
+#include <DNSServer.h>            // Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>     // Local WebServer used to serve the configuration portal
 #include <ESP8266WiFi.h>          // ESP8266 Core WiFi Library (you most likely already have this in your sketch)
 #include <ESP8266mDNS.h>          // ESP8266 MDNS for .local name registration
@@ -26,6 +25,7 @@
 #include "Adafruit_MQTT.h"        // Adafruit.io MQTT library
 #include "Adafruit_MQTT_Client.h" // Adafruit.io MQTT library
 #include <ArduinoJson.h>          // https://github.com/bblanchon/ArduinoJson
+#include <InfluxDb.h>             // InfluxDB support
 
 // Configuration
 
@@ -33,6 +33,7 @@
 #define AUTHORIZATION "CHANGEME" // hackAIR authorisation token
 #define DEBUG "0"               // set this to 1 to stop sending data to the hackAIR platform
 #define ADAFRUIT_IO_ENABLE "0"  // set this to 1 to enable Adafruit.io sending
+#define INFLUXDB_ENABLE "0" // set this to 1 to enable InfluxDB support 
 
 // Adafruit MQTT
 
@@ -42,6 +43,14 @@
 #define AIO_KEY         "AIO_KEY"
 #define AIO_PM25        "PM25FEED"
 #define AIO_PM10        "PM10FEED"
+
+// InfluxDB support
+
+#define INFLUXDB_HOST "178.62.245.175"
+#define INFLUXDB_PORT "8086"
+#define INFLUXDB_DATABASE "aq"
+#define INFLUXDB_USER ""
+#define INFLUXDB_PASS ""
 
 // No more configuration below this line
 
@@ -62,7 +71,7 @@ void saveConfigCallback () {
 hackAIR sensor(SENSOR_SDS011);
 
 // Setup the temperature and humidity sensor (pin D4)
-DHT dht(D4, DHT11);
+DHT dht(D4, DHT22);
 
 // Measurement interval
 const unsigned long minutes_time_interval = 5;
@@ -165,7 +174,7 @@ void setup() {
    wifiManager.addParameter(&custom_osem_token);
 
   // start the sensor once with the following line uncommented to reset previous WiFi settings
-  // wifiManager.resetSettings();
+  //wifiManager.resetSettings();
   
   if (!wifiManager.autoConnect("ESP-wemos")) {
     Serial.println("failed to connect, please push reset button and try again");
@@ -210,7 +219,8 @@ void setup() {
 }
 
 void loop() {
-  
+
+  int chip_id = ESP.getChipId();
   float vdd = ESP.getVcc() / 500.0;
   
   while (WiFi.status() != WL_CONNECTED) {
@@ -219,9 +229,12 @@ void loop() {
     Serial.print(".");
   }
 
-
   double pm25 = data.pm25;
   double pm10 = data.pm10;
+
+  float env_temp = dht.readTemperature();
+  float env_hum = dht.readHumidity();
+  
   int error = 0;
   Serial.println("Measuring...");
 
@@ -266,6 +279,8 @@ void loop() {
         pm10_feed.publish(data.pm10);
         
     }
+
+    
     
     // Send the data to the hackAIR server
 
@@ -338,7 +353,38 @@ void loop() {
     Serial.println(DEBUG);
     Serial.print("hackair API token: ");
     Serial.println(hackair_api_token); // write API token
+    Serial.print("Chip ID: ");
+    Serial.println(chip_id);
+    Serial.print("Temperature: ");
+    Serial.println(env_temp);
+    Serial.print("Humidity: ");
+    Serial.println(env_hum);
     Serial.println(dataJson); // write sensor values to serial for debug
+
+    if ( INFLUXDB_ENABLE == "1" ) {
+
+      // connect to influxdb
+
+      Influxdb influx(INFLUXDB_HOST); // port defaults to 8086
+      influx.setDbAuth(INFLUXDB_DATABASE, INFLUXDB_USER, INFLUXDB_PASS); // with authentication
+
+      String influx_chip_id = String(chip_id);
+      
+      // create a measurement object
+      InfluxData measurement ("airquality");
+      measurement.addTag("device", influx_chip_id);
+      measurement.addTag("sensor", "sds11");
+      measurement.addValue("pm10", data.pm10);
+      measurement.addValue("pm25", data.pm25);
+      measurement.addValue("temperature", env_temp);
+      measurement.addValue("humidity", env_hum);
+
+      // write it into db
+      influx.write(measurement);
+
+      client.println("Writing to InfluxDB");
+
+    }
       
     }
     
