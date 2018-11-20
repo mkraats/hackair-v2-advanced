@@ -14,7 +14,6 @@
 
 #include <Arduino.h>
 #include <DHT.h>                  // Adafruit's DHT sensor library https://github.com/adafruit/DHT-sensor-library
-// #include <DHT_U.h>
 #include <DNSServer.h>            // Local DNS Server used for redirecting all requests to the configuration portal
 #include <ESP8266WebServer.h>     // Local WebServer used to serve the configuration portal
 #include <ESP8266WiFi.h>          // ESP8266 Core WiFi Library (you most likely already have this in your sketch)
@@ -55,7 +54,9 @@
 
 // No more configuration below this line
 
-char hackair_api_token[48]; // hackAIR API token to be collected via WiFiManager on first start
+char hackair_api_token[50]; // hackAIR API token to be collected via WiFiManager on first start
+char sensebox_id[30]; // openSenseMap senseBox ID
+char osem_token[70]; // openSenseMap senseBox access token
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -130,6 +131,8 @@ void setup() {
           Serial.println("\nparsed json");
 
           strcpy(hackair_api_token, json["hackair_api_token"]);
+          strcpy(sensebox_id, json["sensebox_id"]);
+          strcpy(osem_token, json["osem_token"]);
           
         } else {
           Serial.println("failed to load json config");
@@ -160,9 +163,15 @@ void setup() {
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  WiFiManagerParameter custom_hackair_api_token("hackair_api_token", "hackAIR Access Key", hackair_api_token, 48);
+  // WiFiManagerParameter custom_hackair_api_token("hackair_api_token", "hackAIR API token", hackair_api_token, 40);
+
+  WiFiManagerParameter custom_hackair_api_token("hackair_api_token", "hackAIR Access Key", hackair_api_token, 44);
+  WiFiManagerParameter custom_sensebox_id("sensebox_id", "openSenseMap senseBox ID", sensebox_id, 24);
+  WiFiManagerParameter custom_osem_token("osem_token", "senseBox access token", osem_token, 64);
   
    wifiManager.addParameter(&custom_hackair_api_token);
+   wifiManager.addParameter(&custom_sensebox_id);
+   wifiManager.addParameter(&custom_osem_token);
 
   // start the sensor once with the following line uncommented to reset previous WiFi settings
   //wifiManager.resetSettings();
@@ -176,6 +185,8 @@ void setup() {
 
   //read updated parameters
   strcpy(hackair_api_token, custom_hackair_api_token.getValue());
+  strcpy(sensebox_id, custom_sensebox_id.getValue());
+  strcpy(osem_token, custom_osem_token.getValue());
 
   //save the custom parameters to FS
   if (shouldSaveConfig) {
@@ -183,6 +194,8 @@ void setup() {
     DynamicJsonBuffer jsonBuffer;
     JsonObject& json = jsonBuffer.createObject();
     json["hackair_api_token"] = hackair_api_token;
+    json["sensebox_id"] = sensebox_id;
+    json["osem_token"] = osem_token;
  
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) {
@@ -299,6 +312,38 @@ void loop() {
     client.stop();
   }
   delay(1000);
+
+  // Send data to openSenseMap
+  if ( sensebox_id != "" && osem_token != "") {
+    // Send the data to the openSenseMap server
+    Serial.println("Sending data to openSenseMap platform...");
+    if (client.connect("api.opensensemap.org", 443)) {
+      Serial.println("Connected to api.opensensemap.org");
+      client.print("POST /boxes/");
+      client.print(sensebox_id);
+      client.print("/data?hackair=true HTTP/1.1\r\n");
+      client.print("Host: api.opensensemap.org\r\n");
+      client.print("Connection: close\r\n");
+      client.print("Authorization: ");
+      client.println(osem_token);
+      client.print("Cache-Control: no-cache\r\n");
+      client.print("Content-Type: application/json\r\n");
+      client.print("Content-Length: ");
+      client.println(dataJson.length() + 2);
+      client.println("");
+      client.println(dataJson);
+      Serial.println(dataJson);
+      delay(500);
+
+      while (client.available()) {
+        char c = client.read();
+
+        Serial.print(c);
+      }
+    }
+    client.stop();
+    delay(1000);
+    }
    
   } else {
 
