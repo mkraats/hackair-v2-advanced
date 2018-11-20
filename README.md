@@ -7,7 +7,8 @@ This sensor has the following changes from the official version:
 - Adafruit.IO support so you can graph your PM10/PM25 values in real time.
 - Debug mode for development ( ie, don't send data to platform when the sensor is on your desk )
 - Support for mDNS to make sensor reachable via hackair.local.
-- Support for adding hackAIR API key via WiFiManager. 
+- Support for adding hackAIR API key via WiFiManager.
+- Support for sending data to InfluxDB.
 
 # Important: ArduinoJSON library support
 
