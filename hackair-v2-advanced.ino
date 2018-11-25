@@ -30,7 +30,6 @@
 // Configuration
 
 #define HOSTNAME "hackair" // hostname to use for MDNS under the .local extension ( hackair.local )
-#define AUTHORIZATION "CHANGEME" // hackAIR authorisation token
 #define DEBUG "0"               // set this to 1 to stop sending data to the hackAIR platform
 #define ADAFRUIT_IO_ENABLE "0"  // set this to 1 to enable Adafruit.io sending
 #define INFLUXDB_ENABLE "0" // set this to 1 to enable InfluxDB support 
@@ -46,7 +45,7 @@
 
 // InfluxDB support
 
-#define INFLUXDB_HOST "178.62.245.175"
+#define INFLUXDB_HOST ""
 #define INFLUXDB_PORT "8086"
 #define INFLUXDB_DATABASE "aq"
 #define INFLUXDB_USER ""
@@ -54,9 +53,9 @@
 
 // No more configuration below this line
 
-char hackair_api_token[50]; // hackAIR API token to be collected via WiFiManager on first start
-char sensebox_id[30]; // openSenseMap senseBox ID
-char osem_token[70]; // openSenseMap senseBox access token
+char hackair_api_token[44]; // hackAIR API token to be collected via WiFiManager on first start
+char sensebox_id[40]; // openSenseMap senseBox ID
+char osem_token[80]; // openSenseMap senseBox access token
 
 //flag for saving data
 bool shouldSaveConfig = false;
@@ -126,14 +125,20 @@ void setup() {
         configFile.readBytes(buf.get(), size);
         DynamicJsonBuffer jsonBuffer;
         JsonObject& json = jsonBuffer.parseObject(buf.get());
-        json.printTo(Serial);
+        json.prettyPrintTo(Serial);
         if (json.success()) {
           Serial.println("\nparsed json");
 
-          strcpy(hackair_api_token, json["hackair_api_token"]);
-          strcpy(sensebox_id, json["sensebox_id"]);
-          strcpy(osem_token, json["osem_token"]);
-          
+          strcpy(hackair_api_token, json["hackair_api_token"]);  
+
+          const char* my_osem_token = json["osem_token"];
+          strcpy(osem_token, my_osem_token);
+          Serial.println(osem_token);
+
+          const char* my_sensebox_id = json["sensebox_id"];
+          strcpy(sensebox_id, my_sensebox_id);
+          Serial.println(sensebox_id);
+                 
         } else {
           Serial.println("failed to load json config");
         }
@@ -141,11 +146,6 @@ void setup() {
     }
   } else {
     Serial.println("failed to mount FS");
-  }
-  
-
-  if ( AUTHORIZATION == "AUTHORIZATION TOKEN" ) {
-    Serial.println("ERROR: no authorization token specified");
   }
   
   // Initialize the PM sensor
@@ -163,18 +163,16 @@ void setup() {
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  // WiFiManagerParameter custom_hackair_api_token("hackair_api_token", "hackAIR API token", hackair_api_token, 40);
-
   WiFiManagerParameter custom_hackair_api_token("hackair_api_token", "hackAIR Access Key", hackair_api_token, 44);
-  WiFiManagerParameter custom_sensebox_id("sensebox_id", "openSenseMap senseBox ID", sensebox_id, 24);
-  WiFiManagerParameter custom_osem_token("osem_token", "senseBox access token", osem_token, 64);
+  WiFiManagerParameter custom_sensebox_id("sensebox_id", "openSenseMap senseBox ID", sensebox_id, 40);
+  WiFiManagerParameter custom_osem_token("osem_token", "senseBox access token", osem_token, 80);
   
    wifiManager.addParameter(&custom_hackair_api_token);
    wifiManager.addParameter(&custom_sensebox_id);
    wifiManager.addParameter(&custom_osem_token);
 
   // start the sensor once with the following line uncommented to reset previous WiFi settings
-  //wifiManager.resetSettings();
+  // wifiManager.resetSettings();
   
   if (!wifiManager.autoConnect("ESP-wemos")) {
     Serial.println("failed to connect, please push reset button and try again");
@@ -310,6 +308,9 @@ void loop() {
       Serial.print(c);
     }
     client.stop();
+  } else {
+    
+    Serial.println("Unable to send data to hackAIR platform\n");
   }
   delay(1000);
 
@@ -317,6 +318,11 @@ void loop() {
   if ( sensebox_id != "" && osem_token != "") {
     // Send the data to the openSenseMap server
     Serial.println("Sending data to openSenseMap platform...");
+    Serial.println(sensebox_id);
+    Serial.println("OSEM:\n");
+    Serial.println(osem_token);
+    Serial.println("\nEND\n");
+    
     if (client.connect("api.opensensemap.org", 443)) {
       Serial.println("Connected to api.opensensemap.org");
       client.print("POST /boxes/");
@@ -343,7 +349,12 @@ void loop() {
     }
     client.stop();
     delay(1000);
+    } else {
+        
+      Serial.println("Unable to send data to openSenseMap platform\n");
+      
     }
+   
    
   } else {
 
