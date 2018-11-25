@@ -9,6 +9,7 @@ This sensor has the following changes from the official version:
 - Support for mDNS to make sensor reachable via hackair.local.
 - Support for adding hackAIR API key via WiFiManager.
 - Support for sending data to InfluxDB.
+- Support for sending data to openSensemap.
 
 # Important: ArduinoJSON library support
 
